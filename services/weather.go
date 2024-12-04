@@ -13,6 +13,7 @@ const nwsURL = "https://api.weather.gov/points/"
 
 func FetchWeatherForecast(latitude float64, longitude float64) (string, error) {
 	pointsURL := fmt.Sprintf("https://api.weather.gov/points/%f,%f", latitude, longitude)
+
 	// step 1 fetch weather forecast: curl -sL https://api.weather.gov/points/33.50921,-111.89903 | jq '.properties.forecast'
 	resp, err := http.Get(pointsURL)
 	if err != nil {

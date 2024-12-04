@@ -2,108 +2,69 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
+	"os"
 
 	"github.com/elisahu1/take-home/services"
+	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog"
+	"golang.org/x/time/rate"
 )
 
+var log zerolog.Logger
+
+func init() {
+	// Set up structured logging to the console
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	log = zerolog.New(os.Stderr).With().Timestamp().Logger()
+}
+
 func main() {
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+
+	var limiter = rate.NewLimiter(rate.Limit(10), 1) // 10 requests per second, with a burst size of 1
+	r := gin.Default()
+
+	// in production, we do not want to trust *,
+	// r.SetTrustedProxies([]string{
+	// 	"10.0.0.1", // ip range for reserve proxy, ngnix
+	// 	"192.168.1.0/24", // ip range for internal proxies
+	// })
+
+	r.Use(func(ctx *gin.Context) {
+		if !limiter.Allow() {
+			ctx.JSON(http.StatusTooManyRequests, gin.H{"error": "too much request, try again later"})
+			ctx.Abort()
+			return
+		}
+		ctx.Next()
+	})
+
+	r.GET("/", func(c *gin.Context) {
 		location, err := services.FetchRandomLocation()
 		if err != nil {
-			http.Error(w, "Failed to fetch location", http.StatusInternalServerError)
+			log.Error().Err(err).Msg("Failed to fetch random location")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "fail to get random location"})
 			return
 		}
 
 		forecast, err := services.FetchWeatherForecast(location.Latitude, location.Longitude)
 		if err != nil {
-			http.Error(w, "Failed to fetch weather forecast", http.StatusInternalServerError)
+			log.Error().Err(err).Msg("Failed to fetch weather forecast")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "fail to get weather report"})
 			return
 		}
 
-		response := fmt.Sprintf("The weather in %s is: %s \n", location.Name, forecast)
-		w.Write([]byte(response))
+		response := fmt.Sprintf("The weather in %s is:%s", location.Name, forecast)
+
+		c.JSON(http.StatusOK, gin.H{
+			"message": response,
+		})
 	})
 
 	log.Println("Server started at :5000")
-	log.Fatal(http.ListenAndServe(":5000", nil))
+	err := r.Run(":5000")
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to start the server")
+		os.Exit(1)
+	}
 }
-
-// func fetchRandomLocation() (Location, error) {
-// 	resp, err := http.Get("https://locations.patch3s.dev/api/random")
-// 	if err != nil {
-// 		return Location{}, err
-// 	}
-// 	defer resp.Body.Close()
-
-// 	body, err := io.ReadAll(resp.Body)
-// 	if err != nil {
-// 		return Location{}, err
-// 	}
-
-// 	var locationResponse LocationResponse
-// 	err = json.Unmarshal(body, &locationResponse)
-// 	if err != nil {
-// 		fmt.Println("err:", err)
-// 		return Location{}, err
-// 	}
-
-// 	fmt.Println("after unmarshal:", locationResponse)
-
-// 	if len(locationResponse.Locations) == 0 {
-// 		return Location{}, fmt.Errorf("no locations found")
-// 	}
-
-// 	return locationResponse.Locations[0], nil
-// }
-
-// func fetchWeatherForecast(latitude float64, longitude float64) (string, error) {
-// 	pointsURL := fmt.Sprintf("https://api.weather.gov/points/%f,%f", latitude, longitude)
-// 	// step 1 fetch weather forecast: curl -sL https://api.weather.gov/points/33.50921,-111.89903 | jq '.properties.forecast'
-// 	resp, err := http.Get(pointsURL)
-// 	if err != nil {
-// 		return "", err
-// 	}
-// 	defer resp.Body.Close()
-
-// 	body, err := io.ReadAll(resp.Body)
-// 	if err != nil {
-// 		return "", err
-// 	}
-
-// 	// log.Println("Raw JSON response:", string(body))
-
-// 	var pointsResponse PointsResponse
-// 	err = json.Unmarshal(body, &pointsResponse)
-// 	if err != nil {
-// 		return "", err
-// 	}
-
-// 	forecastURL := pointsResponse.Properties.ForecastURL
-
-// 	// step 2 fetch weather forecast, curl -s https://api.weather.gov/gridpoints/PSR/166,60/forecast
-// 	resp, err = http.Get(forecastURL)
-// 	if err != nil {
-// 		return "", err
-// 	}
-// 	defer resp.Body.Close()
-
-// 	body, err = io.ReadAll(resp.Body)
-// 	if err != nil {
-// 		return "", err
-// 	}
-
-// 	var forecastResponse ForecastResponse
-// 	err = json.Unmarshal(body, &forecastResponse)
-// 	if err != nil {
-// 		return "", err
-// 	}
-
-// 	// | jq '.properties.periods[0].detailedForecast'
-// 	if len(forecastResponse.Properties.Periods) == 0 {
-// 		return "", fmt.Errorf("no forecast periods found")
-// 	}
-
-// 	return forecastResponse.Properties.Periods[0].DetailedForecast, nil
-// }
