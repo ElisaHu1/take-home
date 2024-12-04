@@ -3,41 +3,58 @@ package services
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+	"io"
 	"net/http"
-
-	"github.com/elisahu1/take-home/models"
 )
 
 const nwsURL = "https://api.weather.gov/points/"
 
-func FetchWeather(latitude float64, longitude float64) (models.Weather, error) {
-	weatherURL := fmt.Sprintf("%s%.4f,%.4f", nwsURL, latitude, longitude)
-	response, err := http.Get(weatherURL)
+func fetchWeatherForecast(latitude float64, longitude float64) (string, error) {
+	pointsURL := fmt.Sprintf("https://api.weather.gov/points/%f,%f", latitude, longitude)
+	// step 1 fetch weather forecast: curl -sL https://api.weather.gov/points/33.50921,-111.89903 | jq '.properties.forecast'
+	resp, err := http.Get(pointsURL)
 	if err != nil {
-		return models.Weather{}, fmt.Errorf("Get failed: %v", err)
+		return "", err
 	}
+	defer resp.Body.Close()
 
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusOK {
-		return models.Weather{}, fmt.Errorf("NO 200: %v", err)
-	}
-
-	var pointsData map[string]interface{}
-	err = json.NewDecoder(response.Body).Decode(&pointsData)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return models.Weather{}, fmt.Errorf("failed to decode points response: %v", err)
+		return "", err
 	}
 
-	// Log the response
-	responseJSON, err := json.MarshalIndent(pointsData, "", "  ") // Indent for readability
+	// log.Println("Raw JSON response:", string(body))
+
+	var pointsResponse PointsResponse
+	err = json.Unmarshal(body, &pointsResponse)
 	if err != nil {
-		log.Printf("Failed to marshal response for logging: %v", err)
-	} else {
-		log.Printf("API Response:\n%s", string(responseJSON))
+		return "", err
 	}
 
-	return models.Weather{}, nil
+	forecastURL := pointsResponse.Properties.ForecastURL
 
+	// step 2 fetch weather forecast, curl -s https://api.weather.gov/gridpoints/PSR/166,60/forecast
+	resp, err = http.Get(forecastURL)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, err = io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	var forecastResponse ForecastResponse
+	err = json.Unmarshal(body, &forecastResponse)
+	if err != nil {
+		return "", err
+	}
+
+	// | jq '.properties.periods[0].detailedForecast'
+	if len(forecastResponse.Properties.Periods) == 0 {
+		return "", fmt.Errorf("no forecast periods found")
+	}
+
+	return forecastResponse.Properties.Periods[0].DetailedForecast, nil
 }

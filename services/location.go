@@ -3,30 +3,42 @@ package services
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
-
-	"github.com/elisahu1/take-home/models"
 )
 
 const locationURL = "https://locations.patch3s.dev/api/"
 
-func GetRandomLocation() (models.Location, error) {
-	resp, err := http.Get(locationURL)
+func fetchRandomLocation() (Location, error) {
+	resp, err := http.Get(locationURL + "random")
 	if err != nil {
-		return models.Location{}, fmt.Errorf("no response: %v", err)
+		return Location{}, err
 	}
-
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return models.Location{}, fmt.Errorf("error code: %v", err)
-	}
-
-	var location models.Location
-	err = json.NewDecoder(resp.Body).Decode(&location)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return models.Location{}, fmt.Errorf("fail to decode: %v", err)
+		return Location{}, err
 	}
 
-	return location, nil
+	// fmt.Println("raw Body:", string(body))
+	// raw body example: {"locations":[{"name":"Caldwell","latitude":40.83982,"longitude":-74.27654}]}
+
+	var locationResponse LocationResponse
+	err = json.Unmarshal(body, &locationResponse)
+	if err != nil {
+		fmt.Println("err:", err)
+		return Location{}, err
+	}
+
+	// fmt.Println("after unmarshal:", locationResponse)
+	// {[{Caldwell 40.83982 -74.27654}]}
+
+	if len(locationResponse.Locations) == 0 {
+		return Location{}, fmt.Errorf("no locations found")
+	}
+
+	fmt.Println("after unmarshal:", string(locationResponse))
+
+	return locationResponse.Locations[0], nil
 }
