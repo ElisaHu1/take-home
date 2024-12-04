@@ -1,11 +1,12 @@
 package services
 
 import (
-	"_/Users/elisahu/go/take-home/models"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+
+	"github.com/elisahu1/take-home/models"
 )
 
 const nwsURL = "https://api.weather.gov/points/"
@@ -36,5 +37,7 @@ func FetchWeather(latitude float64, longitude float64) (models.Weather, error) {
 	} else {
 		log.Printf("API Response:\n%s", string(responseJSON))
 	}
+
+	return models.Weather{}, nil
 
 }

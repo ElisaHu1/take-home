@@ -2,9 +2,10 @@ package handler
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 
-	"../services"
+	"github.com/elisahu1/take-home/services"
 )
 
 func CombinedHandler(w http.ResponseWriter, r *http.Request) {
@@ -13,12 +14,13 @@ func CombinedHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Error fetching location: %v", err), http.StatusInternalServerError)
 		return
 	}
-
+	log.Printf("what is location: %v", location)
 	weather, err := services.FetchWeather(location.Latitude, location.Longitude)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error fetching weather: %v", err), http.StatusInternalServerError)
 		return
 	}
+	log.Printf("what is weather: %v", weather)
 
 	// result := models.CombinedResult{
 	// 	Location: location,

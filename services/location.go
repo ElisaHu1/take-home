@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"../models"
+	"github.com/elisahu1/take-home/models"
 )
 
 const locationURL = "https://locations.patch3s.dev/api/"
