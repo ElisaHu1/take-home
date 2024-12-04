@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/elisahu1/take-home/models"
 )
 
 const nwsURL = "https://api.weather.gov/points/"
 
-func fetchWeatherForecast(latitude float64, longitude float64) (string, error) {
+func FetchWeatherForecast(latitude float64, longitude float64) (string, error) {
 	pointsURL := fmt.Sprintf("https://api.weather.gov/points/%f,%f", latitude, longitude)
 	// step 1 fetch weather forecast: curl -sL https://api.weather.gov/points/33.50921,-111.89903 | jq '.properties.forecast'
 	resp, err := http.Get(pointsURL)
@@ -25,7 +27,7 @@ func fetchWeatherForecast(latitude float64, longitude float64) (string, error) {
 
 	// log.Println("Raw JSON response:", string(body))
 
-	var pointsResponse PointsResponse
+	var pointsResponse models.PointsResponse
 	err = json.Unmarshal(body, &pointsResponse)
 	if err != nil {
 		return "", err
@@ -45,7 +47,7 @@ func fetchWeatherForecast(latitude float64, longitude float64) (string, error) {
 		return "", err
 	}
 
-	var forecastResponse ForecastResponse
+	var forecastResponse models.ForecastResponse
 	err = json.Unmarshal(body, &forecastResponse)
 	if err != nil {
 		return "", err

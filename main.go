@@ -4,23 +4,25 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+
+	"github.com/elisahu1/take-home/services"
 )
 
 func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		location, err := fetchRandomLocation()
+		location, err := services.FetchRandomLocation()
 		if err != nil {
 			http.Error(w, "Failed to fetch location", http.StatusInternalServerError)
 			return
 		}
 
-		forecast, err := fetchWeatherForecast(location.Latitude, location.Longitude)
+		forecast, err := services.FetchWeatherForecast(location.Latitude, location.Longitude)
 		if err != nil {
 			http.Error(w, "Failed to fetch weather forecast", http.StatusInternalServerError)
 			return
 		}
 
-		response := fmt.Sprintf("The weather in %s is: %s", location.Name, forecast)
+		response := fmt.Sprintf("The weather in %s is: %s \n", location.Name, forecast)
 		w.Write([]byte(response))
 	})
 
